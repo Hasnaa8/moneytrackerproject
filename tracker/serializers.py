@@ -9,7 +9,7 @@ class SpendingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Spending
         fields = [
-            'id', 'owner', 'amount', 'date',
+            'id', 'owner', 'amount', 'date', 'title',
             'category', 'spent_for', 'spent_for_display'
         ]
 
@@ -21,5 +21,5 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = ToBuyItem
         fields = [
-            'id', 'owner', 'category', 'tobuy_for', 'tobuy_for_display'
+            'id', 'owner', 'title', 'category', 'tobuy_for', 'tobuy_for_display'
         ]

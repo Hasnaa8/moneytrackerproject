@@ -12,6 +12,7 @@ class Spending(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField()
     category = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, blank=True)
     spent_for = models.CharField(
         max_length=10,
         choices=SpentForChoices.choices,
@@ -19,7 +20,8 @@ class Spending(models.Model):
     )
 
     def __str__(self):
-        return f"{self.owner.username}: {self.category}, {self.amount} for {self.spent_for}"
+        return f"{self.owner.username}: {self.title} ({self.category}), {self.amount} for {self.spent_for}"
+    
     
 class ToBuyItem(models.Model):
     class ToBuyForChoices(models.TextChoices):
@@ -29,6 +31,7 @@ class ToBuyItem(models.Model):
         OTHER = 'OTHER', 'For Other'
 
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tobuyitems')
+    title = models.CharField(max_length=255, blank=True)
     category = models.CharField(max_length=255)
     tobuy_for = models.CharField(
         max_length=10,
@@ -37,4 +40,4 @@ class ToBuyItem(models.Model):
     )
 
     def __str__(self):
-        return f"{self.owner.username}: {self.category} for {self.tobuy_for}"
+        return f"{self.owner.username}: {self.title} ({self.category}) for {self.tobuy_for}"

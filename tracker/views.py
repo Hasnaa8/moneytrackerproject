@@ -1,16 +1,19 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.utils import timezone
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+
+from tracker.filters import SpendingFilter
 from .models import Spending, ToBuyItem
 from .serializers import SpendingSerializer, ToBuyItemSerializer
 
 class SpendingViewSet(viewsets.ModelViewSet):
     serializer_class = SpendingSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filterset_class = SpendingFilter
 
     def get_queryset(self):
         return Spending.objects.filter(owner=self.request.user).order_by('-date')
@@ -20,35 +23,64 @@ class SpendingViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def calculate_score(self, request):
+        # 1. Get the base queryset (only the user's spending)
         queryset = self.get_queryset()
 
-        date_param = request.query_params.get('date')
-        if date_param:
-            queryset = queryset.filter(date=date_param)
-
-        month_param = request.query_params.get('month')
-        year_param = request.query_params.get('year')
-        if month_param:
-            queryset = queryset.filter(date__month=month_param)
-        if year_param:
-            queryset = queryset.filter(date__year=year_param)
+        # 2. Apply the SpendingFilter
+        filterset = SpendingFilter(request.GET, queryset=queryset)
         
-        spent_for_param = request.query_params.get('spent_for')
-        if spent_for_param:
-            queryset = queryset.filter(spent_for=spent_for_param)
+        if not filterset.is_valid():
+            return Response(filterset.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 3. Get the "Filtered" queryset
+        filtered_qs = filterset.qs
 
-        total_score = queryset.aggregate(Sum('amount'))['amount__sum'] or 0
-
+        # 4. PERFORM THE CALCULATION (This was the missing part!)
+        # We sum the 'amount' field of all items that passed the filter
+        total_score = filtered_qs.aggregate(total=Sum('amount'))['total'] or 0
+        
+        # 5. Return the result
         return Response({
-            "filters_applied": {
-                "date": date_param,
-                "month": month_param,
-                "year": year_param,
-                "spent_for": spent_for_param
-            },
-            "total_count": queryset.count(),
-            "total_score": total_score
-        })
+            "count": filtered_qs.count(),
+            "total_score": total_score,
+            "filters_applied": request.GET  # Useful for the frontend to confirm
+        }, status=status.HTTP_200_OK)
+        # date_param = request.query_params.get('date')
+        # if date_param:
+        #     queryset = queryset.filter(date=date_param)
+
+        # month_param = request.query_params.get('month')
+        # year_param = request.query_params.get('year')
+        # if month_param:
+        #     queryset = queryset.filter(date__month=month_param)
+        # if year_param:
+        #     queryset = queryset.filter(date__year=year_param)
+        
+        # spent_for_param = request.query_params.get('spent_for')
+        # if spent_for_param:
+        #     queryset = queryset.filter(spent_for=spent_for_param)
+
+        # total_score = queryset.aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # return Response({
+        #     "filters_applied": {
+        #         "date": date_param,
+        #         "month": month_param,
+        #         "year": year_param,
+        #         "spent_for": spent_for_param
+        #     },
+        #     "total_count": queryset.count(),
+        #     "total_score": total_score
+        # })
+    @action(detail=False, methods=['get'])
+    def summary_by_category(self, request):
+        # This groups all spending by category and sums the amount for each
+        summary = self.get_queryset().values('category').annotate(
+            total_spent=Sum('amount'),
+            items_count=Count('id')
+        ).order_by('-total_spent')
+
+        return Response(summary)
 
 
 class ToBuyItemViewSet(viewsets.ModelViewSet):
@@ -74,7 +106,12 @@ class ToBuyItemViewSet(viewsets.ModelViewSet):
                 {"error": "يجب إدخال المبلغ (amount)"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response({"error": "يرجى إدخال مبلغ صحيح وأكبر من الصفر"}, status=400)
         try:
             with transaction.atomic():
                 Spending.objects.create(
