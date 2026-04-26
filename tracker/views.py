@@ -35,8 +35,7 @@ class SpendingViewSet(viewsets.ModelViewSet):
         # 3. Get the "Filtered" queryset
         filtered_qs = filterset.qs
 
-        # 4. PERFORM THE CALCULATION (This was the missing part!)
-        # We sum the 'amount' field of all items that passed the filter
+        # 4. PERFORM THE CALCULATION
         total_score = filtered_qs.aggregate(total=Sum('amount'))['total'] or 0
         
         # 5. Return the result
@@ -45,36 +44,9 @@ class SpendingViewSet(viewsets.ModelViewSet):
             "total_score": total_score,
             "filters_applied": request.GET  # Useful for the frontend to confirm
         }, status=status.HTTP_200_OK)
-        # date_param = request.query_params.get('date')
-        # if date_param:
-        #     queryset = queryset.filter(date=date_param)
-
-        # month_param = request.query_params.get('month')
-        # year_param = request.query_params.get('year')
-        # if month_param:
-        #     queryset = queryset.filter(date__month=month_param)
-        # if year_param:
-        #     queryset = queryset.filter(date__year=year_param)
         
-        # spent_for_param = request.query_params.get('spent_for')
-        # if spent_for_param:
-        #     queryset = queryset.filter(spent_for=spent_for_param)
-
-        # total_score = queryset.aggregate(Sum('amount'))['amount__sum'] or 0
-
-        # return Response({
-        #     "filters_applied": {
-        #         "date": date_param,
-        #         "month": month_param,
-        #         "year": year_param,
-        #         "spent_for": spent_for_param
-        #     },
-        #     "total_count": queryset.count(),
-        #     "total_score": total_score
-        # })
     @action(detail=False, methods=['get'])
     def summary_by_category(self, request):
-        # This groups all spending by category and sums the amount for each
         summary = self.get_queryset().values('category').annotate(
             total_spent=Sum('amount'),
             items_count=Count('id')

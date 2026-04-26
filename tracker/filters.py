@@ -2,7 +2,6 @@ import django_filters
 from .models import Spending
 
 class SpendingFilter(django_filters.FilterSet):
-    # Allow filtering by a range! (e.g. from Jan 1st to Jan 15th)
     min_amount = django_filters.NumberFilter(field_name="amount", lookup_expr='gte')
     max_amount = django_filters.NumberFilter(field_name="amount", lookup_expr='lte')
     month = django_filters.NumberFilter(field_name="date", lookup_expr='month')
