@@ -23,3 +23,7 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'owner', 'title', 'category', 'tobuy_for', 'tobuy_for_display'
         ]
+
+
+class BuyItemSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)

@@ -6,9 +6,9 @@ from django.utils import timezone
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
-from tracker.filters import SpendingFilter
+from tracker.filters import SpendingFilter, ToBuyItemFilter
 from .models import Spending, ToBuyItem
-from .serializers import SpendingSerializer, ToBuyItemSerializer
+from .serializers import BuyItemSerializer, SpendingSerializer, ToBuyItemSerializer
 
 class SpendingViewSet(viewsets.ModelViewSet):
     serializer_class = SpendingSerializer
@@ -42,7 +42,7 @@ class SpendingViewSet(viewsets.ModelViewSet):
         return Response({
             "count": filtered_qs.count(),
             "total_score": total_score,
-            "filters_applied": request.GET  # Useful for the frontend to confirm
+            "filters_applied": request.GET 
         }, status=status.HTTP_200_OK)
         
     @action(detail=False, methods=['get'])
@@ -58,6 +58,7 @@ class SpendingViewSet(viewsets.ModelViewSet):
 class ToBuyItemViewSet(viewsets.ModelViewSet):
     serializer_class = ToBuyItemSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filterset_class = ToBuyItemFilter
 
     def get_queryset(self):
         return ToBuyItem.objects.filter(owner=self.request.user)
@@ -65,7 +66,7 @@ class ToBuyItemViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], serializer_class=BuyItemSerializer)
     def buy(self, request, pk=None):
         queryset = self.get_queryset()
         item = get_object_or_404(queryset, pk=pk)
@@ -75,7 +76,7 @@ class ToBuyItemViewSet(viewsets.ModelViewSet):
 
         if not amount:
             return Response(
-                {"error": "يجب إدخال المبلغ (amount)"}, 
+                {"error": "Please enter a purchase amount"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         try:
@@ -83,12 +84,13 @@ class ToBuyItemViewSet(viewsets.ModelViewSet):
             if amount <= 0:
                 raise ValueError
         except (TypeError, ValueError):
-            return Response({"error": "يرجى إدخال مبلغ صحيح وأكبر من الصفر"}, status=400)
+            return Response({"error": "Please enter a valid purchase amount"}, status=400)
         try:
             with transaction.atomic():
                 Spending.objects.create(
                     owner=item.owner,
                     category=item.category,
+                    title=item.title,
                     amount=amount,
                     date=date_of_purchase,
                     spent_for=item.tobuy_for
@@ -97,12 +99,12 @@ class ToBuyItemViewSet(viewsets.ModelViewSet):
                 item.delete()
                 
             return Response(
-                {"message": f"تم شراء '{item.category}'"}, 
+                {"message": f"Successfully purchased '{item.tobuy_for}' for {amount} on {date_of_purchase}. Item has been moved to your spending list."},
                 status=status.HTTP_201_CREATED
             )
             
         except Exception as e:
             return Response(
-                {"error": "يرجى المحاولة مرة أخرى"}, 
+                {"error": "Please try again. An unexpected error occurred."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
