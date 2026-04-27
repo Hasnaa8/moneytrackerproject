@@ -28,9 +28,13 @@ class SpendingSerializer(serializers.ModelSerializer):
     spent_for_display = serializers.CharField(source='get_spent_for_display', read_only=True)
     owner = serializers.ReadOnlyField(source='owner.username')
 
-    category_name = serializers.CharField(write_only=True, required=False)
+    category_name = serializers.CharField(write_only=True, required=True)
     category = CategorySerializer(read_only=True)
     
+    spent_for = serializers.ChoiceField(
+        choices=Spending.SpentForChoices.choices,
+        required=True, allow_null=False
+    )
     class Meta:
         model = Spending
         fields = [
@@ -71,8 +75,13 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
     tobuy_for_display = serializers.CharField(source='get_tobuy_for_display', read_only=True)
     owner = serializers.ReadOnlyField(source='owner.username')
     
-    category_name = serializers.CharField(write_only=True, required=False)
+    category_name = serializers.CharField(write_only=True, required=True)
     category = CategorySerializer(read_only=True)
+    
+    tobuy_for = serializers.ChoiceField(
+        choices=ToBuyItem.ToBuyForChoices.choices,
+        required=True, allow_null=False
+    )
     
     class Meta:
         model = ToBuyItem
@@ -118,13 +127,14 @@ class BudgetSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(
         slug_field='name',
         queryset=Category.objects.all(),
-        required=False, allow_null=True
+        required=False, allow_null=True,
     )
 
     spent_for = serializers.ChoiceField(
         choices=Spending.SpentForChoices.choices, 
         required=False, allow_null=True
     )
+    
     month = serializers.IntegerField(
         min_value=1, max_value=12, required=True,
         error_messages={"msg": "Month must be between 1 and 12."}
