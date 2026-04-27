@@ -1,5 +1,5 @@
 import django_filters
-from .models import Spending, ToBuyItem
+from .models import Budget, Spending, ToBuyItem
 
 # Filters for Spendings and ToBuyItems
 
@@ -29,3 +29,12 @@ class ToBuyItemFilter(django_filters.FilterSet):
         model = ToBuyItem
         fields = ['category', 'tobuy_for']
         
+class BudgetFilter(django_filters.FilterSet):
+    month = django_filters.NumberFilter(field_name="month", lookup_expr='exact')
+    year = django_filters.NumberFilter(field_name="year", lookup_expr='exact')
+    spent_for = django_filters.CharFilter(field_name='spent_for', lookup_expr='icontains')
+    category = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
+
+    class Meta:
+        model = Budget
+        fields = ['category', 'spent_for', 'month', 'year']

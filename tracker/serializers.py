@@ -1,7 +1,9 @@
+import datetime
+
 from rest_framework import serializers
 
 from tracker.validators import validate_maximum_categories
-from .models import Category, Spending, ToBuyItem
+from .models import Budget, Category, Spending, ToBuyItem
 
 # Serializers for the tracker app
 
@@ -108,3 +110,59 @@ class BuyItemSerializer(serializers.Serializer):
         if amount <= 0:
             raise serializers.ValidationError("The amount must be a positive number.")
         return amount
+    
+
+class BudgetSerializer(serializers.ModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+    
+    category = serializers.SlugRelatedField(
+        slug_field='name',
+        queryset=Category.objects.all(),
+        required=False, allow_null=True
+    )
+
+    spent_for = serializers.ChoiceField(
+        choices=Spending.SpentForChoices.choices, 
+        required=False, allow_null=True
+    )
+    month = serializers.IntegerField(
+        min_value=1, max_value=12, required=True,
+        error_messages={"msg": "Month must be between 1 and 12."}
+    )
+    year = serializers.IntegerField(
+        min_value=2026, max_value=2099, required=True,
+        error_messages={"msg": "Year must be between 2026 and 2099."}
+    )
+    class Meta:
+        model = Budget
+        fields = ['id', 'owner', 'category', 'spent_for', 'amount', 'month', 'year']
+    
+    def validate(self, data):
+        owner = self.context['request'].user
+        category = data.get('category')
+        spent_for = data.get('spent_for')
+        month = data.get('month')
+        year = data.get('year')
+
+        
+        if category and category.owner != owner:
+            raise serializers.ValidationError("You don't have a category with that name. Please create the category first or choose an existing one.")
+        
+        now = datetime.datetime.now()
+        if year < now.year or (year == now.year and month < now.month):
+            raise serializers.ValidationError("Month and year must be in the future.")
+
+        exists = Budget.objects.filter(
+            owner=owner,
+            category=category,
+            spent_for=spent_for,
+            month=month,
+            year=year
+        ).exists()
+
+        if exists:
+            raise serializers.ValidationError(
+                "A budget for this already exists."
+            )
+        
+        return data
