@@ -25,21 +25,16 @@ class CategorySerializer(serializers.ModelSerializer):
 
 # The SpendingSerializer is used to serialize and validate Spending instances.
 class SpendingSerializer(serializers.ModelSerializer):
-    spent_for_display = serializers.CharField(source='get_spent_for_display', read_only=True)
     owner = serializers.ReadOnlyField(source='owner.username')
 
     category_name = serializers.CharField(write_only=True, required=True)
     category = CategorySerializer(read_only=True)
     
-    spent_for = serializers.ChoiceField(
-        choices=Spending.SpentForChoices.choices,
-        required=True, allow_null=False
-    )
     class Meta:
         model = Spending
         fields = [
             'id', 'owner', 'amount', 'date', 'title',
-            'category_name', 'category', 'spent_for', 'spent_for_display'
+            'category_name', 'category'
         ]
     
     # Validate that the user does not exceed the maximum number of categories when creating a new one.
@@ -72,21 +67,15 @@ class SpendingSerializer(serializers.ModelSerializer):
     
 
 class ToBuyItemSerializer(serializers.ModelSerializer):
-    tobuy_for_display = serializers.CharField(source='get_tobuy_for_display', read_only=True)
     owner = serializers.ReadOnlyField(source='owner.username')
     
     category_name = serializers.CharField(write_only=True, required=True)
     category = CategorySerializer(read_only=True)
     
-    tobuy_for = serializers.ChoiceField(
-        choices=ToBuyItem.ToBuyForChoices.choices,
-        required=True, allow_null=False
-    )
-    
     class Meta:
         model = ToBuyItem
         fields = [
-            'id', 'owner', 'title', 'category', 'category_name', 'tobuy_for', 'tobuy_for_display'
+            'id', 'owner', 'title', 'category', 'category_name'
         ]
     
     # Validate that the user does not exceed the maximum number of categories when creating a new one.
@@ -124,15 +113,12 @@ class BuyItemSerializer(serializers.Serializer):
 class BudgetSerializer(serializers.ModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
     
+    budget_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    actual_spent = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     category = serializers.SlugRelatedField(
         slug_field='name',
         queryset=Category.objects.all(),
         required=False, allow_null=True,
-    )
-
-    spent_for = serializers.ChoiceField(
-        choices=Spending.SpentForChoices.choices, 
-        required=False, allow_null=True
     )
     
     month = serializers.IntegerField(
@@ -143,14 +129,14 @@ class BudgetSerializer(serializers.ModelSerializer):
         min_value=2026, max_value=2099, required=True,
         error_messages={"msg": "Year must be between 2026 and 2099."}
     )
+
     class Meta:
         model = Budget
-        fields = ['id', 'owner', 'category', 'spent_for', 'amount', 'month', 'year']
+        fields = ['id', 'owner', 'category', 'actual_spent', 'budget_amount', 'month', 'year']
     
     def validate(self, data):
         owner = self.context['request'].user
         category = data.get('category')
-        spent_for = data.get('spent_for')
         month = data.get('month')
         year = data.get('year')
 
@@ -162,15 +148,17 @@ class BudgetSerializer(serializers.ModelSerializer):
         if year < now.year or (year == now.year and month < now.month):
             raise serializers.ValidationError("Month and year must be in the future.")
 
-        exists = Budget.objects.filter(
+        budget = Budget.objects.filter(
             owner=owner,
             category=category,
-            spent_for=spent_for,
             month=month,
             year=year
-        ).exists()
+        )
+        # Exclude the current instance from the uniqueness check when updating an existing budget. This allows users to update a budget without triggering a validation error about duplicate budgets.
+        if self.instance:
+            budget = budget.exclude(id=self.instance.id)
 
-        if exists:
+        if budget.exists():
             raise serializers.ValidationError(
                 "A budget for this already exists."
             )

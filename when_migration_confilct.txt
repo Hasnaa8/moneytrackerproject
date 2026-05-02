@@ -1,0 +1,14 @@
+python manage.py shell
+
+
+from tracker.models import Budget
+# This is a "nuclear" option for dev: Delete all budgets to start fresh
+Budget.objects.all().delete()
+exit()
+
+from tracker.models import Budget
+# This is a "nuclear" option for dev: Delete all budgets to start fresh
+ToBuyItem.objects.all().delete()
+Spending.objects.all().delete()
+Category.objects.all().delete()
+exit()

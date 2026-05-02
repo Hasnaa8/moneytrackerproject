@@ -14,27 +14,25 @@ class SpendingFilter(django_filters.FilterSet):
     month = django_filters.NumberFilter(field_name="date", lookup_expr='month')
     year = django_filters.NumberFilter(field_name="date", lookup_expr='year')
     
-    spent_for = django_filters.CharFilter(field_name='spent_for', lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
 
     class Meta:
         model = Spending
-        fields = ['category', 'date', 'spent_for']
+        fields = ['category', 'date']
 
 # The ToBuyItemFilter allows users to filter their to-buy items based on { category & () the item is for }.
 class ToBuyItemFilter(django_filters.FilterSet):
-    tobuy_for = django_filters.CharFilter(field_name='tobuy_for', lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
     class Meta:
         model = ToBuyItem
-        fields = ['category', 'tobuy_for']
+        fields = ['category']
         
 class BudgetFilter(django_filters.FilterSet):
     month = django_filters.NumberFilter(field_name="month", lookup_expr='exact')
     year = django_filters.NumberFilter(field_name="year", lookup_expr='exact')
-    spent_for = django_filters.CharFilter(field_name='spent_for', lookup_expr='icontains')
+    
     category = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
 
     class Meta:
         model = Budget
-        fields = ['category', 'spent_for', 'month', 'year']
+        fields = ['category', 'month', 'year']
